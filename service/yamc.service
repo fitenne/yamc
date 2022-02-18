@@ -1,0 +1,11 @@
+[Unit]
+Description=Prapare cgroups directory for yamc
+After=basic.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=
+
+[Install]
+WantedBy=multi-user.target
