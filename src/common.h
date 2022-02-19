@@ -13,8 +13,24 @@
 
 namespace yamc {
 namespace fs = std::filesystem;
-using mount_list_t = std::vector<std::pair<fs::path, fs::path>>;
 
+struct MountPt {
+    enum class MNT_TYPE { ROBIND, RWBIND, TMPFS };
+    fs::path src;
+    fs::path dest;
+    std::string option;
+    MNT_TYPE type;
+    MountPt(const fs::path &src, const fs::path &dest,
+            const std::string &option, const MNT_TYPE type);
+};
+using mount_list_t = std::vector<MountPt>;
+
+struct Symlink {
+    fs::path src;
+    fs::path dest;
+    Symlink(const fs::path &src, const fs::path &dest);
+};
+using symlink_list_t = std::vector<Symlink>;
 
 struct IDMap {
     typedef unsigned int id_t;

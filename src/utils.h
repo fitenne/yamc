@@ -11,8 +11,10 @@ int tgkill(int tgid, int tid, int sig);
 
 pid_t gettid();
 
-void bindMount(const fs::path& src, const fs::path& target,
-               unsigned long addtional_flag);
+// void bindMount(const fs::path& src, const fs::path& target,
+//                unsigned long addtional_flag);
+void mountFs(const MountPt& mnt, const fs::path& chroot,
+             unsigned long addtional_flag);
 
 /**
  * @brief get a vector of pointers to c-string from a vector of std::string

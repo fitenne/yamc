@@ -21,38 +21,91 @@ int tgkill(int tgid, int tid, int sig) {
 
 pid_t gettid() { return syscall(SYS_gettid); }
 
-/**
- * @brief recursively bind mount src to target with addtional_flag
- *
- * @param addtional_flag see man mount.2
- */
-void bindMount(const fs::path &src, const fs::path &target,
-               unsigned long addtional_flag) {
-    if (fs::is_directory(src) && !fs::exists(target)) {
-        fs::create_directories(target);
-    } else {
-        const auto &par = target.parent_path();
-        if (par == target) {
-            // root provided as target?
-            throw std::runtime_error("unexcepted mount point");
-        }
-        if (!fs::exists(par)) {
-            fs::create_directories(par);
-        }
-        int fd = creat(target.c_str(), 0644);
-        if (fd == -1) {
-            throw std::runtime_error("failed to create " + target.string() +
-                                     ": " + strerror(errno));
-        }
-        close(fd);
-    }
+// /**
+//  * @brief recursively bind mount src to target with addtional_flag
+//  *
+//  * @param addtional_flag see man mount.2
+//  */
+// void bindMount(const fs::path &src, const fs::path &target,
+//                unsigned long addtional_flag) {
+//     if (fs::is_directory(src) && !fs::exists(target)) {
+//         fs::create_directories(target);
+//     } else {
+//         const auto &par = target.parent_path();
+//         if (par == target) {
+//             // root provided as target?
+//             throw std::runtime_error("unexcepted mount point");
+//         }
+//         if (!fs::exists(par)) {
+//             fs::create_directories(par);
+//         }
+//         int fd = creat(target.c_str(), 0644);
+//         if (fd == -1) {
+//             throw std::runtime_error("failed to create " + target.string() +
+//                                      ": " + strerror(errno));
+//         }
+//         close(fd);
+//     }
 
-    if (mount(src.c_str(), target.c_str(), "", MS_BIND | MS_REC, "") == -1 ||
-        mount("", target.c_str(), "",
-              MS_REMOUNT | MS_BIND | MS_REC | MS_NOSUID | addtional_flag,
-              "") == -1) {
-        throw std::runtime_error(std::string("failed to remount : ") +
-                                 strerror(errno));
+//     if (mount(src.c_str(), target.c_str(), "", MS_BIND | MS_REC, "") == -1 ||
+//         mount("", target.c_str(), "",
+//               MS_REMOUNT | MS_BIND | MS_REC | MS_NOSUID | addtional_flag,
+//               "") == -1) {
+//         throw std::runtime_error(std::string("failed to remount : ") +
+//                                  strerror(errno));
+//     }
+// }
+
+void mountFs(const MountPt &mnt, const fs::path &chroot,
+             unsigned long addtional_flag) {
+    const auto target = chroot / mnt.dest.lexically_relative("/");
+
+    if (mnt.type == MountPt::MNT_TYPE::TMPFS) {
+        fs::create_directories(target);
+        if (mount("", target.c_str(), "tmpfs", MS_NODEV | MS_NOEXEC | MS_NOSUID,
+                  mnt.option.c_str()) == -1) {
+            throw std::runtime_error(std::string("failed to mount tmpfs: ") +
+                                     strerror(errno));
+        }
+    } else {
+        if (fs::is_directory(mnt.src) && !fs::exists(target)) {
+            fs::create_directories(target);
+        } else {
+            const auto &par = target.parent_path();
+            // root provided as target?
+            if (par == target)
+                throw std::runtime_error("unexcepted mount point");
+            if (!fs::exists(par)) {
+                fs::create_directories(par);
+            }
+            int fd = creat(target.c_str(), 0644);
+            if (fd == -1) {
+                throw std::runtime_error("failed to create " + target.string() +
+                                         ": " + strerror(errno));
+            }
+            close(fd);
+        }
+
+        if (mnt.type == MountPt::MNT_TYPE::ROBIND) {
+            if (mount(mnt.src.c_str(), target.c_str(), "", MS_BIND | MS_REC,
+                      "") == -1 ||
+                mount(
+                    "", target.c_str(), "",
+                    MS_REMOUNT | MS_BIND | MS_REC | MS_RDONLY | addtional_flag,
+                    "") == -1) {
+                throw std::runtime_error(std::string("failed to remount : ") +
+                                         strerror(errno));
+            }
+        } else {
+            if (mount(mnt.src.c_str(), target.c_str(), "", MS_BIND | MS_REC,
+                      "") == -1 ||
+                mount("", target.c_str(), "",
+                      MS_REMOUNT | MS_BIND | MS_REC | addtional_flag,
+                      "") == -1) {
+                throw std::runtime_error(std::string("failed to remount : ") +
+                                         strerror(errno));
+            }
+        }
     }
 }
 

@@ -55,57 +55,66 @@ int Jail::cloneWorkerProc_(void *_jail) {
 }
 
 void Jail::pivotRoot_() {
-    RAW_DLOG(INFO, "chrooting to %s...", conf_.chroot_path.c_str());
-    if (mount("none", conf_.chroot_path.c_str(), "tmpfs", 0, "") == -1) {
-        RAW_LOG(ERROR, "failed to remount chroot %s",
-                conf_.chroot_path.c_str());
-        throw std::runtime_error(strerror(errno));
-    }
+    try {
+        RAW_DLOG(INFO, "chrooting to %s...", conf_.chroot_path.c_str());
+        if (mount("", conf_.chroot_path.c_str(), "tmpfs", 0, "size=16777216") ==
+            -1) {
+            RAW_LOG(ERROR, "failed to remount chroot %s",
+                    conf_.chroot_path.c_str());
+            throw std::runtime_error(strerror(errno));
+        }
 
-    for (const auto &pair : conf_.robind) {
-        const auto &target =
-            conf_.chroot_path / pair.second.lexically_relative("/");
-        RAW_DLOG(INFO, "ro mounting %s -> %s", pair.first.c_str(),
-                 target.c_str());
-        bindMount(pair.first, target, MS_NOSUID | MS_RDONLY);
-        RAW_DLOG(INFO, "ro mounted %s -> %s", pair.first.c_str(),
-                 target.c_str());
-    }
-    for (const auto &pair : conf_.rwbind) {
-        const auto &target =
-            conf_.chroot_path / pair.second.lexically_relative("/");
-        RAW_DLOG(INFO, "rw mounting %s -> %s", pair.first.c_str(),
-                 target.c_str());
-        bindMount(pair.first, target, MS_NOSUID);
-        RAW_DLOG(INFO, "rw mounted %s -> %s", pair.first.c_str(),
-                 target.c_str());
-    }
+        for (const auto &bind : conf_.robind) {
+            // const auto &target =
+            //     conf_.chroot_path / bind.dest.lexically_relative("/");
+            RAW_DLOG(INFO, "ro mounting %s -> %s", bind.src.c_str(),
+                     bind.dest.c_str());
+            mountFs(bind, conf_.chroot_path, MS_NOSUID);
+            // bindMount(pair.first, target, MS_NOSUID | MS_RDONLY);
+            // RAW_DLOG(INFO, "ro mounted %s -> %s", pair.first.c_str(),
+            //          target.c_str());
+        }
+        for (const auto &bind : conf_.rwbind) {
+            const auto &target =
+                conf_.chroot_path / bind.dest.lexically_relative("/");
+            RAW_DLOG(INFO, "ro mounting %s -> %s", bind.src.c_str(),
+                     bind.dest.c_str());
+            mountFs(bind, conf_.chroot_path, MS_NOSUID);
+            // roBind(bind.src, bind.dest, MS_NOSUID);
+            // bindMount(pair.first, target, MS_NOSUID);
+            // RAW_DLOG(INFO, "rw mounted %s -> %s", pair.first.c_str(),
+            //          target.c_str());
+        }
+        for (const auto &bind : conf_.tmpfs) {
+            RAW_DLOG(INFO, "mounting tmpfs %s", bind.dest.c_str());
+            mountFs(bind, conf_.chroot_path, MS_NOSUID);
+        }
 
-    auto putold = fs::absolute(conf_.chroot_path / "putold");
-    std::error_code ec;
-    fs::create_directory(putold, ec);
-    if (ec) {
-        RAW_LOG(ERROR, "failed to create a directory");
-        throw std::runtime_error(ec.message());
-    }
-    if (pivot_root(conf_.chroot_path.c_str(), putold.c_str()) == -1) {
-        RAW_LOG(ERROR, "failed to pivot_root");
-        throw std::runtime_error(strerror(errno));
-    }
-    if (chdir("/") == -1) {
-        RAW_LOG(ERROR, "failed to chdir to /");
-        throw std::runtime_error(strerror(errno));
-    }
-    if (umount2("putold", MNT_DETACH) == -1) {
-        RAW_LOG(ERROR, "failed to umount old root");
-        throw std::runtime_error(strerror(errno));
-    }
-    fs::remove("putold");
+        const auto proc = conf_.chroot_path / "proc";
+        fs::create_directory(proc);
+        if (mount("", proc.c_str(), "proc", MS_NOSUID | MS_NOEXEC | MS_NODEV,
+                  "") == -1) {
+            RAW_DLOG(INFO, "failed to mount procfs");
+            throw std::runtime_error(strerror(errno));
+        }
 
-    if (mount("", "/", "", MS_REMOUNT | MS_REC | MS_RDONLY | MS_NOSUID, "") ==
-        -1) {
-        RAW_LOG(ERROR, "failed to remount root");
-        throw std::runtime_error(strerror(errno));
+        auto putold = conf_.chroot_path / "putold";
+        fs::create_directory(putold);
+        if (pivot_root(conf_.chroot_path.c_str(), putold.c_str()) == -1 ||
+            chdir("/") == -1 || umount2("putold", MNT_DETACH) == -1 ||
+            !fs::remove("putold")) {
+            RAW_LOG(ERROR, "failed to pivot_root");
+            throw std::runtime_error(strerror(errno));
+        }
+
+        if (mount("", "/", "", MS_REMOUNT | MS_REC | MS_RDONLY | MS_NOSUID,
+                  "") == -1) {
+            RAW_LOG(ERROR, "failed to remount root");
+            throw std::runtime_error(strerror(errno));
+        }
+    } catch (const std::exception &e) {
+        RAW_LOG(ERROR, "failed to pivot root: %s", e.what());
+        throw;
     }
 }
 
@@ -119,8 +128,6 @@ void Jail::inJailed_() {
             RAW_LOG(ERROR, "failed to unshare some namespace");
             throw std::runtime_error(strerror(errno));
         }
-
-        setrlimits_();
 
         pivotRoot_();
 
@@ -159,6 +166,8 @@ void Jail::inJailed_() {
                 throw std::runtime_error(strerror(errno));
             }
         }
+
+        setrlimits_();
 
         arg_helper = strvec2cstr(conf_.cmdline);
         env_helper = strvec2cstr(conf_.env);

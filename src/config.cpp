@@ -6,51 +6,78 @@
 
 namespace yamc {
 
-static const int OPTION_KEY_CHROOT = 'c';
+static const int OPTION_GRP_SPAWN = 0;
+// static const int OPTION_KEY_CHROOT = 'c';
 static const int OPTION_KEY_CHDIR = 1100;
 static const int OPTION_KEY_STDOUT = 'o';
 
-static const int OPTION_KEY_LIMIT_REAL_TIME = 2000;
+static const int OPTION_GRP_LIMIT = 1;
+static const int OPTION_KEY_LIMIT_REAL_TIME = 'r';
 static const int OPTION_KEY_LIMIT_CPU_TIME = 't';
 static const int OPTION_KEY_LIMIT_MEMORY = 'm';
 static const int OPTION_KEY_LIMIT_OUTPUT = 2300;
 static const int OPTION_KEY_LIMIT_PID = 2400;
 static const int OPTION_KEY_LIMIT_OPENFD = 2500;
 
+static const int OPTION_GRP_CONTAINER = 2;
 static const int OPTION_KEY_ENV = 'e';
 static const int OPTION_KEY_HOSTNAME = 'h';
 static const int OPTION_KEY_DOMAINNAME = 'd';
 static const int OPTION_KEY_UID = 'u';
 static const int OPTION_KEY_GID = 'g';
-static const int OPTION_KEY_RWBIND = 3400;
-static const int OPTION_KEY_ROBIND = 3500;
+static const int OPTION_KEY_RWBIND = 'B';
+static const int OPTION_KEY_ROBIND = 'R';
+static const int OPTION_KEY_SYMLNK = 's';
+static const int OPTION_KEY_TMPFS = 3800;
 
 static argp_option options[]{
-    {"chroot", OPTION_KEY_CHROOT, "newroot", 0,
-     "chroot. an existing folder or you need has permission to create it. "
-     "\"/\" is disallowed",
-     0},
-    {"chdir", OPTION_KEY_CHDIR, "chdir", 0, "chdir after chroot", 0},
-    {"stdout", OPTION_KEY_STDOUT, "fd", 0, "redirect stdout to this fd", 0},
+    // {"chroot", OPTION_KEY_CHROOT, "newroot", 0,
+    //  "chroot. an existing folder or you need has permission to create it. "
+    //  "\"/\" is disallowed",
+    //  0},
+    {"chdir", OPTION_KEY_CHDIR, "chdir", 0, "chdir after chroot",
+     OPTION_GRP_SPAWN},
+    {"stdout", OPTION_KEY_STDOUT, "fd", 0, "redirect stdout to this fd",
+     OPTION_GRP_SPAWN},
     {"real", OPTION_KEY_LIMIT_REAL_TIME, "seconds", 0,
-     "real time limit in seconds", 1},
+     "real time limit in seconds", OPTION_GRP_LIMIT},
     {"cpu", OPTION_KEY_LIMIT_CPU_TIME, "seconds", 0,
-     "cpu time limit  in seconds", 1},
+     "cpu time limit  in seconds", OPTION_GRP_LIMIT},
     {"mem", OPTION_KEY_LIMIT_MEMORY, "bytes", 0, "memory+swap limit in bytes",
-     1},
-    {"fsize", OPTION_KEY_LIMIT_OUTPUT, "bytes", 0, "output limit in bytes", 1},
-    {"pid", OPTION_KEY_LIMIT_PID, "pid", 0, "max number of process", 1},
-    {"nfd", OPTION_KEY_LIMIT_OPENFD, "nfd", 0, "max number of opened fd", 1},
-    {"env", OPTION_KEY_ENV, "key=val", 0, "environment variable in jail", 2},
-    {"host", OPTION_KEY_HOSTNAME, "host", 0, "hostname in jail", 2},
-    {"domain", OPTION_KEY_DOMAINNAME, "domain", 0, "domainname in jail", 2},
-    {"uid", OPTION_KEY_UID, "uid", 0, "uid to use", 2},
-    {"gid", OPTION_KEY_GID, "gid", 0, "gid to use", 2},
+     OPTION_GRP_LIMIT},
+    {"fsize", OPTION_KEY_LIMIT_OUTPUT, "bytes", 0, "output limit in bytes",
+     OPTION_GRP_LIMIT},
+    {"pid", OPTION_KEY_LIMIT_PID, "pid", 0, "max number of process",
+     OPTION_GRP_LIMIT},
+    {"nfd", OPTION_KEY_LIMIT_OPENFD, "nfd", 0, "max number of opened fd",
+     OPTION_GRP_LIMIT},
+    {"env", OPTION_KEY_ENV, "key=val", 0,
+     "environment variable in jail. can be specified multiple times",
+     OPTION_GRP_CONTAINER},
+    {"host", OPTION_KEY_HOSTNAME, "host", 0, "hostname in jail",
+     OPTION_GRP_CONTAINER},
+    {"domain", OPTION_KEY_DOMAINNAME, "domain", 0, "domainname in jail",
+     OPTION_GRP_CONTAINER},
+    {"uid", OPTION_KEY_UID, "uid", 0, "uid to use", OPTION_GRP_CONTAINER},
+    {"gid", OPTION_KEY_GID, "gid", 0, "gid to use", OPTION_GRP_CONTAINER},
     {"ro", OPTION_KEY_ROBIND, "src:dest", 0,
-     "robind in the format src:dest. can be specified multiple times.", 2},
+     "additional robind in the format src:dest. can be specified multiple "
+     "times.",
+     OPTION_GRP_CONTAINER},
     {"rw", OPTION_KEY_RWBIND, "src:dest", 0,
-     "rwbind in the format src:dest. can be specified multiple times", 2},
-    {0, 0, 0, 0, 0, 0}};
+     "additional rwbind in the format src:dest. can be specified multiple "
+     "times",
+     OPTION_GRP_CONTAINER},
+    {"symlink", OPTION_KEY_SYMLNK, "src:dest", 0,
+     "additional symlink src that links to dest. can be specified multiple "
+     "times",
+     OPTION_GRP_CONTAINER},
+    {"tmpfs", OPTION_KEY_TMPFS, "dest:option", 0,
+     "additional mount tmpfs at dest with option. can be specified multiple "
+     "times",
+     OPTION_GRP_CONTAINER},
+    {0, 0, 0, 0, 0, 0},
+};
 
 static const char long_help[] =
     "example: yamc -- echo 233\vdefault argument: -c /tmp/yamc<pid> --chdir / "
@@ -59,22 +86,85 @@ static const char long_help[] =
     "<current_uid> -g <current_gid> -e PATH=/usr/bin:/bin -ro <default_robind> "
     "-rw <default_rwbind>";
 
+static std::string key2str(int key) {
+    if (key > 4000) return "";
+    switch (key) {
+        // case OPTION_KEY_CHROOT:
+        //     return "CHROOT";
+        //     break;
+        case OPTION_KEY_CHDIR:
+            return "CHDIR";
+            break;
+        case OPTION_KEY_STDOUT:
+            return "STDOUT";
+            break;
+        case OPTION_KEY_LIMIT_REAL_TIME:
+            return "LIMIT_REAL_TIME";
+            break;
+        case OPTION_KEY_LIMIT_CPU_TIME:
+            return "LIMIT_CPU_TIME";
+            break;
+        case OPTION_KEY_LIMIT_MEMORY:
+            return "LIMIT_MEMORY";
+            break;
+        case OPTION_KEY_LIMIT_OUTPUT:
+            return "LIMIT_OUTPUT";
+            break;
+        case OPTION_KEY_LIMIT_PID:
+            return "LIMIT_PID";
+            break;
+        case OPTION_KEY_LIMIT_OPENFD:
+            return "LIMIT_OPENFD";
+            break;
+        case OPTION_KEY_ENV:
+            return "ENV";
+            break;
+        case OPTION_KEY_HOSTNAME:
+            return "HOSTNAME";
+            break;
+        case OPTION_KEY_DOMAINNAME:
+            return "DOMAINNAME";
+            break;
+        case OPTION_KEY_UID:
+            return "UID";
+            break;
+        case OPTION_KEY_GID:
+            return "GID";
+            break;
+        case OPTION_KEY_RWBIND:
+            return "RWBIND";
+            break;
+        case OPTION_KEY_ROBIND:
+            return "ROBIND";
+            break;
+        case OPTION_KEY_TMPFS:
+            return "TMPFS";
+            break;
+        case OPTION_KEY_SYMLNK:
+            return "SYMLNK";
+            break;
+        default:
+            break;
+    }
+    return "";
+}
+
 static auto parser = [](int key, char* arg, argp_state* state) -> error_t {
     auto conf = (Config*)state->input;
 
-    DLOG(INFO) << "parsed arg: key=" << key << ", val=" << arg;
+    RAW_DLOG(INFO, "parsed arg: key=%s, val=%s", key2str(key).c_str(), arg);
     unsigned long ulval;
-    const int buf_sz = 1024;
-    char src[buf_sz], dest[buf_sz];
+    static const int buf_sz = 1024;
+    char src[buf_sz], dest[buf_sz], option[buf_sz];
     try {
         switch (key) {
-            case OPTION_KEY_CHROOT:
-                if (strcmp(arg, "/") == 0) {
-                    // disallow chroot to "/"
-                    return EINVAL;
-                }
-                conf->chroot_path = arg;
-                break;
+            // case OPTION_KEY_CHROOT:
+            //     if (strcmp(arg, "/") == 0) {
+            //         // disallow chroot to "/"
+            //         return EINVAL;
+            //     }
+            //     conf->chroot_path = arg;
+            //     break;
             case OPTION_KEY_CHDIR:
                 conf->chdir_path = arg;
                 break;
@@ -114,6 +204,9 @@ static auto parser = [](int key, char* arg, argp_state* state) -> error_t {
                 if (ulval < 3) return EINVAL;
                 conf->openfile_limit = ulval;
                 break;
+            case OPTION_KEY_ENV:
+                conf->env.emplace_back(arg);
+                break;
             case OPTION_KEY_HOSTNAME:
                 conf->uts.hostname = arg;
                 break;
@@ -137,18 +230,35 @@ static auto parser = [](int key, char* arg, argp_state* state) -> error_t {
                 conf->use_gid.count = 1;
                 break;
             case OPTION_KEY_ROBIND:
-                if (strnlen(arg, buf_sz) + 1 > buf_sz) return EINVAL;
-                if (sscanf(arg, "%[^:]:%[^:]", src, dest) != 2) {
+                if (strnlen(arg, buf_sz) + 1 > buf_sz) return E2BIG;
+                if (sscanf(arg, "%[^:]:%s", src, dest) != 2) {
                     return EINVAL;
                 }
-                conf->robind.emplace_back(src, dest);
+                conf->robind.emplace_back(src, dest, "",
+                                          MountPt::MNT_TYPE::ROBIND);
                 break;
             case OPTION_KEY_RWBIND:
-                if (strnlen(arg, buf_sz) + 1 > buf_sz) return EINVAL;
-                if (sscanf(arg, "%[^:]:%[^:]", src, dest) != 2) {
+                if (strnlen(arg, buf_sz) + 1 > buf_sz) return E2BIG;
+                if (sscanf(arg, "%[^:]:%s", src, dest) != 2) {
                     return EINVAL;
                 }
-                conf->rwbind.emplace_back(src, dest);
+                conf->robind.emplace_back(src, dest, "",
+                                          MountPt::MNT_TYPE::RWBIND);
+                break;
+            case OPTION_KEY_SYMLNK:
+                if (strnlen(arg, buf_sz) + 1 > buf_sz) return E2BIG;
+                if (sscanf(arg, "%[^:]:%s", src, dest) != 2) {
+                    return EINVAL;
+                }
+                conf->symlink.emplace_back(src, dest);
+                break;
+            case OPTION_KEY_TMPFS:
+                if (strnlen(arg, buf_sz) + 1 > buf_sz) return E2BIG;
+                if (sscanf(arg, "%[^:]:%s", dest, option) != 2) {
+                    return EINVAL;
+                }
+                conf->rwbind.emplace_back("", dest, option,
+                                          MountPt::MNT_TYPE::TMPFS);
                 break;
         }
     } catch (const std::exception& e) {
@@ -168,15 +278,6 @@ static void fillDefaultValue(Config& conf) {
     }
     if (conf.chdir_path.empty()) {
         conf.chdir_path = "/";
-    }
-    if (conf.robind.empty()) {
-        conf.robind = Config::default_robind;
-    }
-    if (conf.rwbind.empty()) {
-        conf.rwbind = Config::default_rwbind;
-    }
-    if (conf.env.empty()) {
-        conf.env = Config::default_env;
     }
     auto ruid = getuid(), rgid = getgid();
     if (conf.use_uid.outside_id == IDMap::NOID ||

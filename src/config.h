@@ -9,18 +9,31 @@ namespace yamc {
 
 struct Config {
     inline static const mount_list_t default_robind{
-        {"/bin", "/bin"},         {"/lib", "/lib"},
-        {"/lib64", "/lib64"},     {"/usr/bin", "/usr/bin"},
-        {"/usr/lib", "/usr/lib"}, {"/usr/lib64", "/usr/lib64"},
+        {"/bin", "/bin", "", MountPt::MNT_TYPE::ROBIND},
+        {"/lib", "/lib", "", MountPt::MNT_TYPE::ROBIND},
+        {"/lib64", "/lib64", "", MountPt::MNT_TYPE::ROBIND},
+        {"/usr/bin", "/usr/bin", "", MountPt::MNT_TYPE::ROBIND},
+        {"/usr/lib", "/usr/lib", "", MountPt::MNT_TYPE::ROBIND},
+        {"/usr/lib64", "/usr/lib64", "", MountPt::MNT_TYPE::ROBIND},
     };
     inline static const mount_list_t default_rwbind{
-        {"/dev/null", "/dev/null"},
-        {"/dev/zero", "/dev/zero"},
-        {"/dev/random", "/dev/random"},
-        {"/dev/urandom", "/dev/urandom"},
+        {"/dev/null", "/dev/null", "", MountPt::MNT_TYPE::RWBIND},
+        {"/dev/zero", "/dev/zero", "", MountPt::MNT_TYPE::RWBIND},
+        {"/dev/random", "/dev/random", "", MountPt::MNT_TYPE::RWBIND},
+        {"/dev/urandom", "/dev/urandom", "", MountPt::MNT_TYPE::RWBIND},
+    };
+    inline static const symlink_list_t default_symlink{
+        {"/dev/stdin", "/proc/self/fd/0"},
+        {"/dev/stdout", "/proc/self/fd/1"},
+        {"/dev/stderr", "/proc/self/fd/2"},
+    };
+    inline static const mount_list_t default_tmpfs{
+        {"", "/run", "mode=755,size=16777216", MountPt::MNT_TYPE::TMPFS},
+        {"", "/tmp", "mode=777,size=16777216", MountPt::MNT_TYPE::TMPFS},
     };
     inline static const std::vector<std::string> default_env{
-        "PATH=/bin:/usr/bin"};
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:.",
+    };
 
     /*
      * resource limit
@@ -35,12 +48,14 @@ struct Config {
     /*
      * container config
      */
-    UTSConfig uts;
-    IDMap use_uid;
-    IDMap use_gid;
-    mount_list_t rwbind;
-    mount_list_t robind;
-    std::vector<std::string> env;
+    UTSConfig uts = UTSConfig{};
+    IDMap use_uid = IDMap{};
+    IDMap use_gid = IDMap{};
+    mount_list_t rwbind = default_rwbind;
+    mount_list_t robind = default_robind;
+    mount_list_t tmpfs = default_tmpfs;
+    symlink_list_t symlink = default_symlink;
+    std::vector<std::string> env = default_env;
 
     /*
      * spawn options
