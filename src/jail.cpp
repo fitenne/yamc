@@ -89,6 +89,11 @@ void Jail::pivotRoot_() {
             RAW_DLOG(INFO, "mounting tmpfs %s", bind.dest.c_str());
             mountFs(bind, conf_.chroot_path, MS_NOSUID);
         }
+        for (const auto &link : conf_.symlink) {
+            const auto target =
+                conf_.chroot_path / link.src.lexically_relative("/");
+            fs::create_symlink(link.dest, target);
+        }
 
         const auto proc = conf_.chroot_path / "proc";
         fs::create_directory(proc);
