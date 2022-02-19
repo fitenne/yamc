@@ -5,7 +5,7 @@ After=basic.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=
+ExecStart=/usr/local/bin/install_cg.sh
 
 [Install]
 WantedBy=multi-user.target
