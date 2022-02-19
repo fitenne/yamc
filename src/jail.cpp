@@ -65,14 +65,9 @@ void Jail::pivotRoot_() {
         }
 
         for (const auto &bind : conf_.robind) {
-            // const auto &target =
-            //     conf_.chroot_path / bind.dest.lexically_relative("/");
             RAW_DLOG(INFO, "ro mounting %s -> %s", bind.src.c_str(),
                      bind.dest.c_str());
             mountFs(bind, conf_.chroot_path, MS_NOSUID);
-            // bindMount(pair.first, target, MS_NOSUID | MS_RDONLY);
-            // RAW_DLOG(INFO, "ro mounted %s -> %s", pair.first.c_str(),
-            //          target.c_str());
         }
         for (const auto &bind : conf_.rwbind) {
             const auto &target =
@@ -80,10 +75,6 @@ void Jail::pivotRoot_() {
             RAW_DLOG(INFO, "ro mounting %s -> %s", bind.src.c_str(),
                      bind.dest.c_str());
             mountFs(bind, conf_.chroot_path, MS_NOSUID);
-            // roBind(bind.src, bind.dest, MS_NOSUID);
-            // bindMount(pair.first, target, MS_NOSUID);
-            // RAW_DLOG(INFO, "rw mounted %s -> %s", pair.first.c_str(),
-            //          target.c_str());
         }
         for (const auto &bind : conf_.tmpfs) {
             RAW_DLOG(INFO, "mounting tmpfs %s", bind.dest.c_str());
@@ -123,6 +114,29 @@ void Jail::pivotRoot_() {
     }
 }
 
+void Jail::redirect_io_() {
+    try {
+        if (conf_.stdin_fd != Config::NO_IO_REDIRECT) {
+            if (dup3(conf_.stdin_fd, STDIN_FILENO, 0) == -1) {
+                throw std::runtime_error(strerror(errno));
+            }
+        }
+        if (conf_.stdout_fd != Config::NO_IO_REDIRECT) {
+            if (dup3(conf_.stdout_fd, STDOUT_FILENO, 0) == -1) {
+                throw std::runtime_error(strerror(errno));
+            }
+        }
+        if (conf_.stderr_fd != Config::NO_IO_REDIRECT) {
+            if (dup3(conf_.stderr_fd, STDERR_FILENO, 0) == -1) {
+                throw std::runtime_error(strerror(errno));
+            }
+        }
+    } catch (const std::exception &e) {
+        RAW_DLOG(INFO, "failed to redirect io");
+        throw;
+    }
+}
+
 void Jail::inJailed_() {
     RAW_DLOG(INFO, "jailed process started");
 
@@ -134,13 +148,6 @@ void Jail::inJailed_() {
             throw std::runtime_error(strerror(errno));
         }
 
-        pivotRoot_();
-
-        if (chdir(conf_.chdir_path.c_str()) == -1) {
-            RAW_LOG(ERROR, "failed to chdir to %s", conf_.chdir_path.c_str());
-            throw std::runtime_error(strerror(errno));
-        }
-
         if (sethostname(conf_.uts.hostname.c_str(),
                         sizeof(conf_.uts.hostname)) == -1 ||
             setdomainname(conf_.uts.domainname.c_str(),
@@ -149,13 +156,14 @@ void Jail::inJailed_() {
             throw std::runtime_error(strerror(errno));
         }
 
-        if (conf_.stdout_fd > 0) {
-            RAW_DLOG(INFO, "redirect %d to %d", STDOUT_FILENO, conf_.stdout_fd);
-            if (dup3(conf_.stdout_fd, STDOUT_FILENO, 0) == -1) {
-                RAW_LOG(ERROR, "failed to redirect stdout to fd %d",
-                        conf_.stdout_fd);
-                throw std::runtime_error(strerror(errno));
-            }
+        redirect_io_();
+        pivotRoot_();
+        setrlimits_();
+
+
+        if (chdir(conf_.chdir_path.c_str()) == -1) {
+            RAW_LOG(ERROR, "failed to chdir to %s", conf_.chdir_path.c_str());
+            throw std::runtime_error(strerror(errno));
         }
 
         // credentials with less privilege ?
@@ -171,8 +179,6 @@ void Jail::inJailed_() {
                 throw std::runtime_error(strerror(errno));
             }
         }
-
-        setrlimits_();
 
         arg_helper = strvec2cstr(conf_.cmdline);
         env_helper = strvec2cstr(conf_.env);

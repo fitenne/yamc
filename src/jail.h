@@ -32,6 +32,8 @@ class Jail {
 
     void pivotRoot_();
 
+    void redirect_io_();
+
     /**
      * @brief return true if disalarmed. false otherwise
      *

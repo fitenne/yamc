@@ -7,9 +7,7 @@
 namespace yamc {
 
 static const int OPTION_GRP_SPAWN = 0;
-// static const int OPTION_KEY_CHROOT = 'c';
 static const int OPTION_KEY_CHDIR = 1100;
-static const int OPTION_KEY_STDOUT = 'o';
 
 static const int OPTION_GRP_LIMIT = 1;
 static const int OPTION_KEY_LIMIT_REAL_TIME = 'r';
@@ -20,7 +18,10 @@ static const int OPTION_KEY_LIMIT_PID = 2400;
 static const int OPTION_KEY_LIMIT_OPENFD = 2500;
 
 static const int OPTION_GRP_CONTAINER = 2;
-static const int OPTION_KEY_ENV = 'e';
+static const int OPTION_KEY_STDIN = 'i';
+static const int OPTION_KEY_STDOUT = 'o';
+static const int OPTION_KEY_STDERR = 'e';
+static const int OPTION_KEY_ENV = 2000;
 static const int OPTION_KEY_HOSTNAME = 'h';
 static const int OPTION_KEY_DOMAINNAME = 'd';
 static const int OPTION_KEY_UID = 'u';
@@ -34,13 +35,7 @@ static const int OPTION_GRP_HELP = 3;
 static const int OPTION_KEY_DEFT = 4000;
 
 static argp_option options[]{
-    // {"chroot", OPTION_KEY_CHROOT, "newroot", 0,
-    //  "chroot. an existing folder or you need has permission to create it. "
-    //  "\"/\" is disallowed",
-    //  0},
     {"chdir", OPTION_KEY_CHDIR, "chdir", 0, "chdir after chroot",
-     OPTION_GRP_SPAWN},
-    {"stdout", OPTION_KEY_STDOUT, "fd", 0, "redirect stdout to this fd",
      OPTION_GRP_SPAWN},
     {"real", OPTION_KEY_LIMIT_REAL_TIME, "seconds", 0,
      "real time limit in seconds", OPTION_GRP_LIMIT},
@@ -54,6 +49,12 @@ static argp_option options[]{
      OPTION_GRP_LIMIT},
     {"nfd", OPTION_KEY_LIMIT_OPENFD, "nfd", 0, "max number of opened fd",
      OPTION_GRP_LIMIT},
+    {"stdin", OPTION_KEY_STDIN, "fd", 0, "redirect this fd to stdin",
+     OPTION_GRP_CONTAINER},
+    {"stdout", OPTION_KEY_STDOUT, "fd", 0, "redirect stdout to this fd",
+     OPTION_GRP_CONTAINER},
+    {"stderr", OPTION_KEY_STDERR, "fd", 0, "redirect stderr to this fd",
+     OPTION_GRP_CONTAINER},
     {"env", OPTION_KEY_ENV, "key=val", 0,
      "environment variable in jail. can be specified multiple times",
      OPTION_GRP_CONTAINER},
@@ -90,14 +91,8 @@ static const char long_help[] =
 static std::string key2str(int key) {
     if (key > 4000) return "";
     switch (key) {
-        // case OPTION_KEY_CHROOT:
-        //     return "CHROOT";
-        //     break;
         case OPTION_KEY_CHDIR:
             return "CHDIR";
-            break;
-        case OPTION_KEY_STDOUT:
-            return "STDOUT";
             break;
         case OPTION_KEY_LIMIT_REAL_TIME:
             return "LIMIT_REAL_TIME";
@@ -116,6 +111,15 @@ static std::string key2str(int key) {
             break;
         case OPTION_KEY_LIMIT_OPENFD:
             return "LIMIT_OPENFD";
+            break;
+        case OPTION_KEY_STDIN:
+            return "STDIN";
+            break;
+        case OPTION_KEY_STDOUT:
+            return "STDOUT";
+            break;
+        case OPTION_KEY_STDERR:
+            return "STDERR";
             break;
         case OPTION_KEY_ENV:
             return "ENV";
@@ -184,22 +188,8 @@ static auto parser = [](int key, char *arg, argp_state *state) -> error_t {
     static const int buf_sz = 1024;
     char src[buf_sz], dest[buf_sz], option[buf_sz];
     switch (key) {
-        // case OPTION_KEY_CHROOT:
-        //     if (strcmp(arg, "/") == 0) {
-        //         // disallow chroot to "/"
-        //         return EINVAL;
-        //     }
-        //     conf->chroot_path = arg;
-        //     break;
         case OPTION_KEY_CHDIR:
             conf->chdir_path = arg;
-            break;
-        case OPTION_KEY_STDOUT:
-            ulval = strtoul(arg, nullptr, 10);
-            if (errno != 0)
-                argp_failure(state, EXIT_FAILURE, errno, "overflow");
-            if (ulval <= 0) return EINVAL;
-            conf->stdout_fd = ulval;
             break;
         case OPTION_KEY_LIMIT_REAL_TIME:
             ulval = strtoul(arg, nullptr, 10);
@@ -222,6 +212,13 @@ static auto parser = [](int key, char *arg, argp_state *state) -> error_t {
             if (ulval <= 0) return EINVAL;
             conf->memory_limit = ulval;
             break;
+        case OPTION_KEY_LIMIT_OUTPUT:
+            ulval = strtoul(arg, nullptr, 10);
+            if (errno != 0)
+                argp_failure(state, EXIT_FAILURE, errno, "overflow");
+            if (ulval <= 0) return EINVAL;
+            conf->output_limit = ulval;
+            break;
         case OPTION_KEY_LIMIT_PID:
             ulval = strtoul(arg, nullptr, 10);
             if (errno != 0)
@@ -235,6 +232,27 @@ static auto parser = [](int key, char *arg, argp_state *state) -> error_t {
                 argp_failure(state, EXIT_FAILURE, errno, "overflow");
             if (ulval < 3) return EINVAL;
             conf->openfile_limit = ulval;
+            break;
+        case OPTION_KEY_STDIN:
+            ulval = strtoul(arg, nullptr, 10);
+            if (errno != 0)
+                argp_failure(state, EXIT_FAILURE, errno, "overflow");
+            if (ulval <= 3) return EINVAL;
+            conf->stdin_fd = ulval;
+            break;
+        case OPTION_KEY_STDOUT:
+            ulval = strtoul(arg, nullptr, 10);
+            if (errno != 0)
+                argp_failure(state, EXIT_FAILURE, errno, "overflow");
+            if (ulval <= 3) return EINVAL;
+            conf->stdout_fd = ulval;
+            break;
+        case OPTION_KEY_STDERR:
+            ulval = strtoul(arg, nullptr, 10);
+            if (errno != 0)
+                argp_failure(state, EXIT_FAILURE, errno, "overflow");
+            if (ulval <= 3) return EINVAL;
+            conf->stderr_fd = ulval;
             break;
         case OPTION_KEY_ENV:
             conf->env.emplace_back(arg);
@@ -310,9 +328,7 @@ static const ::argp argp = {
 };
 
 static void fillDefaultValue(Config &conf) {
-    if (conf.chroot_path.empty()) {
-        conf.chroot_path = "/tmp/yamc" + std::to_string(getpid());
-    }
+    conf.chroot_path = "/tmp/yamc" + std::to_string(getpid());
     if (conf.chdir_path.empty()) {
         conf.chdir_path = "/";
     }
@@ -329,6 +345,14 @@ static void fillDefaultValue(Config &conf) {
         conf.use_gid.outside_id = rgid;
         conf.use_gid.count = 1;
     }
+}
+
+bool checkConf(Config &conf) {
+    if (conf.stdin_fd == conf.stdout_fd &&
+        conf.stdout_fd != Config::NO_IO_REDIRECT) {
+        return false;
+    }
+    return true;
 }
 
 Config parseOptions(int argc, char *argv[]) {
@@ -348,6 +372,10 @@ Config parseOptions(int argc, char *argv[]) {
     }
 
     fillDefaultValue(conf);
+    if (!checkConf(conf)) {
+        argp_help(&argp, stdout, ARGP_HELP_USAGE, argv[0]);
+        exit(0);
+    }
     return conf;
 }
 
