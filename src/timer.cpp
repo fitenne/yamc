@@ -1,11 +1,5 @@
 #include "timer.h"
 
-#include <poll.h>
-#include <sys/eventfd.h>
-#include <unistd.h>
-
-#include <cstring>
-#include <stdexcept>
 
 namespace yamc {
 
