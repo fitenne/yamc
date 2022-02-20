@@ -1,11 +1,11 @@
 [Unit]
-Description=Prapare cgroups directory for yamc
+Description=prepare cgroups directory for yamc
 After=basic.target
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/local/bin/install_cg.sh
+ExecStart=/bin/bash /usr/local/bin/yamc_inscg.sh
 
 [Install]
 WantedBy=multi-user.target

@@ -10,8 +10,6 @@
 #include "jail.h"
 #include "utils.h"
 
-bool own_root_dir;
-
 bool createWorkingDir(const yamc::fs::path &root) {
     if (!yamc::fs::exists(root)) {
         DLOG(INFO) << "creating new root directory: "
@@ -118,7 +116,7 @@ int main(int argc, char *argv[]) {
                << "gid: " << conf.use_gid.outside_id;
 
     try {
-        own_root_dir = createWorkingDir(conf.chroot_path);
+        createWorkingDir(conf.chroot_path);
 
         fakeRoot(conf);
 
@@ -130,7 +128,7 @@ int main(int argc, char *argv[]) {
     }
 
     std::error_code ec;
-    if (own_root_dir && !std::filesystem::remove(conf.chroot_path, ec)) {
+    if (!std::filesystem::remove(conf.chroot_path, ec)) {
         DLOG(ERROR) << "failed to remove " << conf.chroot_path << ": "
                     << ec.message();
     }

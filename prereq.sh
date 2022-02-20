@@ -1,36 +1,46 @@
 #/bin/bash
 
+# uid and gid that will run container
+ruid=1000
+rgid=1000
+# uid and gid that used inside container
+yamc_uid=1720
+yamc_gid=1720
+
 if [ `id -u` -ne 0 ]; then
     echo 'root needed'
     exit 1
 fi
 
-if [ `sudo useradd -u 1720 -M -s /usr/sbin/nologin yamc` -ne 0 ]; then
+useradd -u $yamc_uid -M -s /usr/sbin/nologin yamc
+
+if [ $? -ne 0 ]; then
     echo 'failed to create new user for yamc'
     exit 2
 fi
 
-cg_script='
-#/bib/bash
+echo "$ruid:$yamc_uid:1" >> /etc/subuid
+echo "$rgid:$yamc_gid:1" >> /etc/subgid
+
+echo "#/bin/bash
 
 base_dir=/sys/fs/cgroup
-sub_sys=(memory cpuset cpu cpuacct pids)
+sub_sys=(memory cpu cpuacct pids)
 
-for sys in ${sub_sys[@]}; do
-      if ! test -d "$base_dir/$sys/yamc"; then
-            rm "$base_dir/$sys/yamc"
+for sys in \${sub_sys[@]}; do
+      if test -e \$base_dir/\$sys/yamc -a ! -d \$base_dir/\$sys/yamc; then
+            rm \$base_dir/\$sys/yamc
       fi
-      mkdir -p "$base_dir/$sys/yamc"
-      chown 1720:1720 "$base_dir/$sys/yamc"
-      chown 1720:1720 "$base_dir/$sys/yamc/cgroup.procs"
+      mkdir -p \$base_dir/\$sys/yamc
+      chown $ruid:$rgid \$base_dir/\$sys/yamc
+      chown $ruid:$rgid \$base_dir/\$sys/yamc/cgroup.procs
 done
-'
 
-echo "`id -u`:1720:1" >> /etc/subuid
-echo "`id -u`:1720:1" >> /etc/subgid
-echo $cg_script > service/install_cg.sh
+exit 0" > service/yamc_inscg.sh
 
-cp service/install_cg.sh /usr/local/bin
-cp service/yamc.service /lib/systemd/system/yamc.service
+install -m 555 service/yamc_inscg.sh /usr/local/bin/yamc_inscg.sh
+install -m 644 service/yamc.service /lib/systemd/system/yamc.service
 
-exit 0
+systemctl daemon-reload
+
+echo 'use "systemctl enable --now yamc.service" to start cgroup service'
