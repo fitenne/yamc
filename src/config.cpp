@@ -224,7 +224,7 @@ static auto parser = [](int key, char *arg, argp_state *state) -> error_t {
             if (errno != 0)
                 argp_failure(state, EXIT_FAILURE, errno, "overflow");
             if (ulval <= 0) return EINVAL;
-            conf->memory_limit = ulval;
+            conf->pid_limit = ulval;
             break;
         case OPTION_KEY_LIMIT_OPENFD:
             ulval = strtoul(arg, nullptr, 10);

@@ -97,6 +97,7 @@ long long Cgroup::getMemoryUsage() const {
 }
 
 void Cgroup::setMemoryLimit(long long limit_bytes) const {
+    RAW_DLOG(INFO, "setting memory limit: %lld", limit_bytes);
     writeTo_(CG_SUBSYS::MEMORY, "memory.swappiness", 0);
     writeTo_(CG_SUBSYS::MEMORY, "memory.limit_in_bytes", limit_bytes);
     writeTo_(CG_SUBSYS::MEMORY, "memory.memsw.limit_in_bytes", limit_bytes);

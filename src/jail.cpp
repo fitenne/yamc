@@ -343,7 +343,7 @@ bool Jail::killChild() {
 }
 
 int Jail::run() {
-    static const int stack_size = 16 * 1024 * 1024;
+    static const int stack_size = 8 * 1024 * 1024;
     uint8_t *stack =
         (uint8_t *)mmap(nullptr, stack_size, PROT_WRITE | PROT_READ,
                         MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0);

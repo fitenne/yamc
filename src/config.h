@@ -44,8 +44,8 @@ struct Config {
     std::chrono::seconds real_time_limit = std::chrono::seconds(10);
     unsigned long memory_limit = 32 * 1024 * 1024;  // bytes
     unsigned long output_limit = 10 * 1024 * 1024;  // bytes
-    unsigned long pid_limit = 16;
-    unsigned long openfile_limit = 128;
+    unsigned long pid_limit = 32;
+    unsigned long openfile_limit = 16;
 
     /*
      * container config
