@@ -137,6 +137,27 @@ void Jail::redirect_io_() {
     }
 }
 
+void Jail::changeCred_() {
+    // credentials with less privilege ?
+    if (conf_.use_gid.inside_id != 0) {
+        if (setgid(conf_.use_gid.inside_id) == -1) {
+            RAW_LOG(ERROR, "failed to set gid inside jail");
+            throw std::runtime_error(strerror(errno));
+        }
+        gid_t groups[1] = {conf_.use_uid.inside_id};
+        if (setgroups(1, groups) == -1) {
+            RAW_LOG(ERROR, "failed to call setgroups");
+            throw std::runtime_error(strerror(errno));
+        }
+    }
+    if (conf_.use_uid.inside_id != 0) {
+        if (setuid(conf_.use_uid.inside_id) == -1) {
+            RAW_LOG(ERROR, "failed to set uid inside jail");
+            throw std::runtime_error(strerror(errno));
+        }
+    }
+}
+
 void Jail::inJailed_() {
     RAW_DLOG(INFO, "jailed process started");
 
@@ -159,25 +180,11 @@ void Jail::inJailed_() {
         redirect_io_();
         pivotRoot_();
         setrlimits_();
-
+        changeCred_();
 
         if (chdir(conf_.chdir_path.c_str()) == -1) {
             RAW_LOG(ERROR, "failed to chdir to %s", conf_.chdir_path.c_str());
             throw std::runtime_error(strerror(errno));
-        }
-
-        // credentials with less privilege ?
-        if (conf_.use_gid.outside_id != IDMap::NOID) {
-            if (setgid(conf_.use_gid.inside_id) == -1) {
-                RAW_LOG(ERROR, "failed to set gid inside jail");
-                throw std::runtime_error(strerror(errno));
-            }
-        }
-        if (conf_.use_uid.outside_id != IDMap::NOID) {
-            if (setuid(conf_.use_uid.inside_id) == -1) {
-                RAW_LOG(ERROR, "failed to set uid inside jail");
-                throw std::runtime_error(strerror(errno));
-            }
         }
 
         arg_helper = strvec2cstr(conf_.cmdline);
@@ -336,7 +343,6 @@ bool Jail::killChild() {
     // just ignore ESRCH
     if (kill(jailed_pid_, SIGKILL) == -1 && errno != ESRCH) {
         RAW_LOG(ERROR, "failed to kill jailed process: %s", strerror(errno));
-        RAW_LOG(ERROR, "you should termiante everything right away");
         return false;
     }
     return true;

@@ -34,6 +34,8 @@ class Jail {
 
     void redirect_io_();
 
+    void changeCred_();
+
     /**
      * @brief return true if disalarmed. false otherwise
      *

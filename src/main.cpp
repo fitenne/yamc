@@ -10,7 +10,7 @@
 #include "jail.h"
 #include "utils.h"
 
-bool createWorkingDir(const yamc::fs::path &root) {
+static bool createWorkingDir(const yamc::fs::path &root) {
     if (!yamc::fs::exists(root)) {
         DLOG(INFO) << "creating new root directory: "
                    << yamc::fs::absolute(root);
@@ -20,7 +20,7 @@ bool createWorkingDir(const yamc::fs::path &root) {
     return false;
 }
 
-void fakeRoot(const yamc::Config &conf) {
+static void fakeRoot(const yamc::Config &conf) {
     static const auto dummyFun = [](void *) -> int {
         pause();
         return 0;
@@ -98,6 +98,7 @@ void fakeRoot(const yamc::Config &conf) {
         munmap(stack, dummyFun_stack_size);
         throw;
     }
+    munmap(stack, dummyFun_stack_size);
 
     if (setuid(0) == -1) {
         throw std::runtime_error("failed to become fake root");
@@ -127,6 +128,7 @@ int main(int argc, char *argv[]) {
         LOG(ERROR) << e.what();
     }
 
+    DLOG(INFO) << "cleaning up " << conf.chroot_path;
     std::error_code ec;
     if (!std::filesystem::remove(conf.chroot_path, ec)) {
         DLOG(ERROR) << "failed to remove " << conf.chroot_path << ": "

@@ -45,7 +45,7 @@ yamc -u 1720 -g 1720 -- echo 233
 
 1. debian 10 
 
-[debian 10 以及更旧的版本默认只有 root 用户可以创建 user namespace](https://salsa.debian.org/kernel-team/linux/-/blob/d98e00eda6bea437e39b9e80444eee84a32438a6/debian/patches/debian/add-sysctl-to-disallow-unprivileged-CLONE_NEWUSER-by-default.patch)
+debian 10 以及更旧的版本默认只有 root 用户可以创建 user namespace, 该 [path](https://salsa.debian.org/kernel-team/linux/-/blob/d98e00eda6bea437e39b9e80444eee84a32438a6/debian/patches/debian/add-sysctl-to-disallow-unprivileged-CLONE_NEWUSER-by-default.patch) 在 debian 11 中被移除。
 
 参考 https://superuser.com/questions/1094597/enable-user-namespaces-in-debian-kernel 取消这一限制。
 
@@ -53,7 +53,7 @@ yamc -u 1720 -g 1720 -- echo 233
 
 2. 默认根目录
 
-容器默认不挂载 [`/etc/alternatives`](https://linux.die.net/man/8/alternatives)、 [`/usr/libexec/`](https://refspecs.linuxfoundation.org/FHS_3.0/fhs-3.0.pdf)。
+容器默认不挂载 [`/etc/alternatives`](https://linux.die.net/man/8/alternatives)、 [`/usr/libexec/`](https://refspecs.linuxfoundation.org/FHS_3.0/fhs-3.0.pdf)，这可能导致一些语言运行时不可用。
 
 # 感谢
 

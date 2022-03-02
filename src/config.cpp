@@ -347,9 +347,14 @@ static void fillDefaultValue(Config &conf) {
     }
 }
 
-bool checkConf(Config &conf) {
+static bool checkConf(Config &conf) {
     if (conf.stdin_fd == conf.stdout_fd &&
         conf.stdout_fd != Config::NO_IO_REDIRECT) {
+        return false;
+    }
+    // or just disallow stderr?
+    if (conf.stdin_fd == conf.stderr_fd &&
+        conf.stderr_fd != Config::NO_IO_REDIRECT) {
         return false;
     }
     return true;
