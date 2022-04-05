@@ -57,6 +57,7 @@ int Jail::cloneWorkerProc_(void *_jail) {
 void Jail::pivotRoot_() {
     try {
         RAW_DLOG(INFO, "chrooting to %s...", conf_.chroot_path.c_str());
+        // see `man pivot_root.2`
         if (mount("", conf_.chroot_path.c_str(), "tmpfs", 0, "size=16777216") ==
             -1) {
             RAW_LOG(ERROR, "failed to remount chroot %s",
@@ -191,17 +192,18 @@ void Jail::inJailed_() {
         env_helper = strvec2cstr(conf_.env);
         sendTo_(SOCK::OUTSIDE, MESSAGE::READY);
         recvFrom_(SOCK::OUTSIDE);  // should be MESSAGE::RUN
+
+        RAW_DLOG(INFO, "execving %s", arg_helper[0]);
+        execvpe(arg_helper[0], (char *const *)arg_helper.data(),
+                (char *const *)env_helper.data());
+
+        RAW_LOG(ERROR, "failed to call execv: %s", strerror(errno));
+        throw std::runtime_error(strerror(errno));
     } catch (const std::exception &e) {
         RAW_LOG(ERROR, "error in jailed process: %s", strerror(errno));
         sendTo_(SOCK::OUTSIDE, MESSAGE::ERROR);
         exit(EXIT_FAILURE);
     }
-
-    RAW_DLOG(INFO, "execving %s", arg_helper[0]);
-    execvpe(arg_helper[0], (char *const *)arg_helper.data(),
-            (char *const *)env_helper.data());
-
-    RAW_LOG(ERROR, "failed to call execv: %s", strerror(errno));
 }
 
 void Jail::waitJailed_() {
